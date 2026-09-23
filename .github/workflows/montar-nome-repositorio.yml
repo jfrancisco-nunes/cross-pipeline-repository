@@ -2,6 +2,8 @@ name: Montar nome de repositório
 
 # Dispare manualmente informando projeto, tipo, objetivo e nome (opcional)
 # para obter o nome final já validado contra o padrão da organização.
+# Opcionalmente já cria o repositório e aciona a governança de pós-criação
+# (visibilidade privada, proteção da main e template de release para libs).
 
 on:
   workflow_dispatch:
@@ -30,10 +32,21 @@ on:
       nome:
         description: "Complemento descritivo opcional"
         required: false
+      criar-repositorio:
+        description: "Criar o repositório de fato após validar o nome"
+        required: true
+        type: boolean
+        default: false
+      dono:
+        description: "Organização/usuário onde o repositório será criado"
+        required: false
+        default: "jfrancisco-nunes"
 
 jobs:
   montar-nome:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,3 +64,26 @@ jobs:
         run: |
           echo "### Nome de repositório sugerido" >> "$GITHUB_STEP_SUMMARY"
           echo "\`${{ steps.nome.outputs.nome-repositorio }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Falhar se o nome não passou na validação
+        if: steps.nome.outputs.valido != 'true'
+        run: |
+          echo "Nome inválido, repositório não será criado." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Criar repositório
+        if: inputs.criar-repositorio == true
+        run: |
+          gh repo create "${{ inputs.dono }}/${{ steps.nome.outputs.nome-repositorio }}" \
+            --private \
+            --confirm
+
+      - name: Acionar governança de pós-criação
+        if: inputs.criar-repositorio == true
+        run: |
+          gh api \
+            --method POST \
+            "/repos/jfrancisco-nunes/cross-pipeline-repository/dispatches" \
+            -f event_type=repo-criado \
+            -f "client_payload[repo_owner]=${{ inputs.dono }}" \
+            -f "client_payload[repo_name]=${{ steps.nome.outputs.nome-repositorio }}"

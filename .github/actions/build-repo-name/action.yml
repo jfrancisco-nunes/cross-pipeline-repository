@@ -23,6 +23,9 @@ outputs:
   tipo:
     description: "Tipo extraído do nome final, após validação"
     value: ${{ steps.validar.outputs.tipo }}
+  valido:
+    description: "'true' se o nome final passou na validação, 'false' caso contrário"
+    value: ${{ steps.validar.outputs.valido }}
 runs:
   using: "composite"
   steps:
@@ -55,6 +58,7 @@ runs:
     - name: Validar nome final
       id: validar
       shell: bash
+      continue-on-error: true
       run: |
         python cross-pipeline-repository/scripts/validar_nome_repositorio.py \
           "${{ steps.montar.outputs.nome-repositorio }}" --github-output
