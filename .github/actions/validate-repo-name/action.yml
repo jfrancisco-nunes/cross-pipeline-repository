@@ -1,0 +1,29 @@
+name: "Validar nome de repositório"
+description: "Valida o nome de um repositório contra o padrão de nomenclatura da organização"
+inputs:
+  nome-repositorio:
+    description: "Nome do repositório a validar (padrão: nome do repositório atual)"
+    required: false
+    default: ${{ github.event.repository.name }}
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout regras de nomenclatura
+      uses: actions/checkout@v4
+      with:
+        repository: SEU_ORG/cross-pipeline-repository
+        path: cross-pipeline-repository
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Instalar dependências
+      shell: bash
+      run: pip install pyyaml
+
+    - name: Executar validação
+      shell: bash
+      run: |
+        python cross-pipeline-repository/scripts/validar_nome_repositorio.py "${{ inputs.nome-repositorio }}"

@@ -1,0 +1,45 @@
+name: Proteger branch main
+
+# Aplica branch protection na `main` de um repositório, bloqueando push direto
+# e exigindo pull request com aprovação. Requer um token com permissão de
+# administração no repositório alvo (secrets.ORG_ADMIN_TOKEN).
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo-owner:
+        description: "Dono do repositório (org ou usuário)"
+        required: true
+      repo-name:
+        description: "Nome do repositório"
+        required: true
+  workflow_call:
+    inputs:
+      repo-owner:
+        required: true
+        type: string
+      repo-name:
+        required: true
+        type: string
+
+jobs:
+  proteger-main:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      REPO_OWNER: ${{ inputs.repo-owner }}
+      REPO_NAME: ${{ inputs.repo-name }}
+    steps:
+      - name: Bloquear push direto e exigir pull request na main
+        run: |
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO_OWNER/$REPO_NAME/branches/main/protection" \
+            -f "required_status_checks[strict]=true" \
+            -f "enforce_admins=true" \
+            -f "required_pull_request_reviews[required_approving_review_count]=1" \
+            -f "required_pull_request_reviews[dismiss_stale_reviews]=true" \
+            -F "restrictions=null" \
+            -F "allow_force_pushes=false" \
+            -F "allow_deletions=false"

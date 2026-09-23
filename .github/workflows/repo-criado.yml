@@ -1,0 +1,79 @@
+name: Repositório criado na organização
+
+# Disparado externamente (ex.: GitHub App ou automação de organização) via
+# `repository_dispatch` sempre que um novo repositório é criado. O GITHUB_TOKEN
+# padrão não tem permissão de escrita em outros repositórios, então é necessário
+# um token de organização (secret ORG_ADMIN_TOKEN) com escopo `repo` e `admin:org`.
+#
+# Payload esperado do repository_dispatch (client_payload):
+#   { "repo_owner": "minha-org", "repo_name": "payments-svc-checkout-api" }
+
+on:
+  repository_dispatch:
+    types: [repo-criado]
+
+jobs:
+  validar-e-configurar:
+    runs-on: ubuntu-latest
+    env:
+      REPO_OWNER: ${{ github.event.client_payload.repo_owner }}
+      REPO_NAME: ${{ github.event.client_payload.repo_name }}
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+    steps:
+      - name: Checkout regras de nomenclatura
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install pyyaml
+
+      - name: Validar nome do novo repositório
+        id: validar
+        continue-on-error: true
+        run: python scripts/validar_nome_repositorio.py "$REPO_NAME" --github-output
+
+      - name: Abrir issue de não conformidade
+        if: steps.validar.outputs.valido == 'false'
+        run: |
+          gh issue create \
+            --repo "$REPO_OWNER/$REPO_NAME" \
+            --title "⚠️ Nome de repositório fora do padrão da organização" \
+            --body "O nome \`$REPO_NAME\` não segue a convenção definida em [CONVENCAO_NOMES.md](https://github.com/$REPO_OWNER/cross-pipeline-repository/blob/main/docs/CONVENCAO_NOMES.md). Formato esperado: \`<projeto>-<tipo>-<objetivo>[-<nome>]\` (ex.: \`payments-svc-checkout-api\`; use \`cross\` como <projeto> quando o repositório integrar mais de um projeto). Considere renomear o repositório."
+
+      - name: Aplicar template padrão (nome conforme)
+        if: steps.validar.outputs.valido == 'true'
+        run: |
+          echo "Nome conforme o padrão. Nenhuma ação corretiva necessária."
+          # Ponto de extensão: aplicar topics, CODEOWNERS ou README padrão
+          # via `gh api` conforme necessidade.
+
+      - name: Aplicar workflow de release (repositórios lib)
+        if: steps.validar.outputs.tipo == 'lib'
+        run: |
+          CONTEUDO_BASE64=$(base64 -w 0 templates/workflows/lib-release.yml 2>/dev/null || base64 templates/workflows/lib-release.yml)
+
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO_OWNER/$REPO_NAME/contents/.github/workflows/main.yml" \
+            -f "message=chore: adiciona pipeline de release padrão para repositório lib" \
+            -f "content=$CONTEUDO_BASE64" \
+            -f "branch=main"
+
+      - name: Bloquear push direto e exigir pull request na main
+        run: |
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO_OWNER/$REPO_NAME/branches/main/protection" \
+            -f "required_status_checks[strict]=true" \
+            -f "enforce_admins=true" \
+            -f "required_pull_request_reviews[required_approving_review_count]=1" \
+            -f "required_pull_request_reviews[dismiss_stale_reviews]=true" \
+            -F "restrictions=null" \
+            -F "allow_force_pushes=false" \
+            -F "allow_deletions=false"

@@ -1,0 +1,37 @@
+name: Validar nome de repositório
+
+# Este workflow tem dois usos:
+# 1) Auto-validação: garante que este próprio repositório siga o padrão.
+# 2) Reutilizável: outros repositórios podem chamá-lo via `workflow_call`
+#    dentro da sua própria pipeline de CI para validar o nome do repositório.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      nome-repositorio:
+        description: "Nome do repositório a validar"
+        required: false
+        type: string
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install pyyaml
+
+      - name: Validar nome
+        run: |
+          NOME="${{ inputs.nome-repositorio || github.event.repository.name }}"
+          python scripts/validar_nome_repositorio.py "$NOME"

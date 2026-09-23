@@ -1,0 +1,148 @@
+name: Pipeline
+
+# Libservice release pipeline: manual runs always release the current
+# version declared in pyproject.toml from the main branch.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release package
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------------------------------------
+      # Checkout (always main, regardless of dispatch ref)
+      # ---------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # ---------------------------------------------------------
+      # Python
+      # ---------------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      # ---------------------------------------------------------
+      # Ler versão em pyproject.toml
+      # ---------------------------------------------------------
+      - name: Read package version
+        id: version
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import pathlib
+
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text()
+
+          match = re.search(r'(?m)^version = "(\d+\.\d+\.\d+)"$', text)
+          if not match:
+              raise SystemExit("version line not found in pyproject.toml")
+
+          version = match.group(1)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"version={version}\n")
+
+          print(f"Package version: {version}")
+          PY
+
+      # ---------------------------------------------------------
+      # Verificar se a tag/release já existe
+      # ---------------------------------------------------------
+      - name: Check if release already exists
+        id: release_check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} already exists and will be replaced."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} does not exist."
+          fi
+
+      # ---------------------------------------------------------
+      # Remover tag e release existentes (substituição)
+      # ---------------------------------------------------------
+      - name: Delete existing tag and release
+        if: steps.release_check.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+
+          git tag -d "$TAG" || true
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          git push origin ":refs/tags/${TAG}" || true
+
+      # ---------------------------------------------------------
+      # Instalar dependências
+      # ---------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+          pip install -e .
+
+      # ---------------------------------------------------------
+      # Rodar testes
+      # ---------------------------------------------------------
+      - name: Run tests
+        run: |
+          pytest
+
+      # ---------------------------------------------------------
+      # Build
+      # ---------------------------------------------------------
+      - name: Build package
+        run: |
+          python -m build
+
+      # ---------------------------------------------------------
+      # Verificar artefatos
+      # ---------------------------------------------------------
+      - name: Check build artifacts
+        run: |
+          ls -lah dist/
+
+      # ---------------------------------------------------------
+      # Criar tag
+      # ---------------------------------------------------------
+      - name: Create Git tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      # ---------------------------------------------------------
+      # Criar GitHub Release (distribuição via release assets, sem PyPI)
+      # ---------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
+
+          gh release create "$TAG" \
+            dist/* \
+            --title "Release $TAG" \
+            --generate-notes

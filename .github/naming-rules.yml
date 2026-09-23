@@ -1,0 +1,37 @@
+# Regras de nomenclatura de repositórios (fonte machine-readable)
+# Usado pelo script scripts/validar_nome_repositorio.py
+# Mantenha sincronizado com docs/CONVENCAO_NOMES.md
+#
+# Formato: <projeto>-<tipo>-<objetivo>[-<nome>]
+# <projeto> é "cross" quando o repositório integra/atravessa mais de um projeto.
+
+min_length: 5
+max_length: 60
+
+# regex aplicada ao nome completo do repositório
+pattern: '^(?P<projeto>[a-z0-9]+)-(?P<tipo>svc|lib|infra|data|docs|web|mobile|tool|poc|pipeline)-(?P<objetivo>[a-z0-9]+)(-(?P<nome>[a-z0-9]+(-[a-z0-9]+)*))?$'
+
+tipos_validos:
+  - svc
+  - lib
+  - infra
+  - data
+  - docs
+  - web
+  - mobile
+  - tool
+  - poc
+  - pipeline
+
+palavras_proibidas:
+  - test
+  - tmp
+  - temp
+  - foo
+  - bar
+  - asdf
+  - novo
+  - new
+  - teste
+  - xxx
+  - sample
