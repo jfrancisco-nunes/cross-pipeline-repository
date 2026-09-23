@@ -89,3 +89,5 @@ hífen), usado quando `<objetivo>` sozinho não é suficiente para identificar o
 5. Repositórios com `<tipo>` igual a `lib` recebem automaticamente o workflow de release em
    `.github/workflows/main.yml`, a partir do template
    [`templates/workflows/lib-release.yml`](../templates/workflows/lib-release.yml).
+6. O workflow também garante que o repositório seja **privado** por padrão — veja
+   [`docs/GOVERNANCA_BRANCHES.md`](GOVERNANCA_BRANCHES.md).

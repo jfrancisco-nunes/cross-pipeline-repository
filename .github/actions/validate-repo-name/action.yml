@@ -11,7 +11,7 @@ runs:
     - name: Checkout regras de nomenclatura
       uses: actions/checkout@v4
       with:
-        repository: SEU_ORG/cross-pipeline-repository
+        repository: jfrancisco-nunes/cross-pipeline-repository
         path: cross-pipeline-repository
 
     - name: Configurar Python

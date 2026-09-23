@@ -1,0 +1,53 @@
+name: Montar nome de repositório
+
+# Dispare manualmente informando projeto, tipo, objetivo e nome (opcional)
+# para obter o nome final já validado contra o padrão da organização.
+
+on:
+  workflow_dispatch:
+    inputs:
+      projeto:
+        description: "Projeto/produto (use 'cross' se integrar mais de um projeto)"
+        required: true
+      tipo:
+        description: "svc, lib, infra, data, docs, web, mobile, tool, poc ou pipeline"
+        required: true
+        type: choice
+        options:
+          - svc
+          - lib
+          - infra
+          - data
+          - docs
+          - web
+          - mobile
+          - tool
+          - poc
+          - pipeline
+      objetivo:
+        description: "Propósito específico do repositório"
+        required: true
+      nome:
+        description: "Complemento descritivo opcional"
+        required: false
+
+jobs:
+  montar-nome:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Montar e validar nome
+        id: nome
+        uses: ./.github/actions/build-repo-name
+        with:
+          projeto: ${{ inputs.projeto }}
+          tipo: ${{ inputs.tipo }}
+          objetivo: ${{ inputs.objetivo }}
+          nome: ${{ inputs.nome }}
+
+      - name: Publicar resultado
+        run: |
+          echo "### Nome de repositório sugerido" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.nome.outputs.nome-repositorio }}\`" >> "$GITHUB_STEP_SUMMARY"

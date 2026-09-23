@@ -1,0 +1,60 @@
+name: "Montar e validar nome de repositório"
+description: >
+  Monta o nome final de um repositório a partir de <projeto>, <tipo>, <objetivo> e <nome>
+  (opcional) e valida contra o padrão de nomenclatura da organização.
+inputs:
+  projeto:
+    description: "Projeto/produto dono do repositório (use 'cross' se integrar mais de um projeto)"
+    required: true
+  tipo:
+    description: "Tipo do repositório (svc, lib, infra, data, docs, web, mobile, tool, poc, pipeline)"
+    required: true
+  objetivo:
+    description: "Propósito específico do repositório dentro do tipo"
+    required: true
+  nome:
+    description: "Complemento descritivo opcional (uma ou mais palavras separadas por hífen)"
+    required: false
+    default: ""
+outputs:
+  nome-repositorio:
+    description: "Nome final montado, ex.: payments-svc-checkout-api"
+    value: ${{ steps.montar.outputs.nome-repositorio }}
+  tipo:
+    description: "Tipo extraído do nome final, após validação"
+    value: ${{ steps.validar.outputs.tipo }}
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout regras de nomenclatura
+      uses: actions/checkout@v4
+      with:
+        repository: jfrancisco-nunes/cross-pipeline-repository
+        path: cross-pipeline-repository
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Instalar dependências
+      shell: bash
+      run: pip install pyyaml
+
+    - name: Montar nome final
+      id: montar
+      shell: bash
+      run: |
+        NOME_FINAL="${{ inputs.projeto }}-${{ inputs.tipo }}-${{ inputs.objetivo }}"
+        if [ -n "${{ inputs.nome }}" ]; then
+          NOME_FINAL="${NOME_FINAL}-${{ inputs.nome }}"
+        fi
+        echo "nome-repositorio=$NOME_FINAL" >> "$GITHUB_OUTPUT"
+        echo "Nome montado: $NOME_FINAL"
+
+    - name: Validar nome final
+      id: validar
+      shell: bash
+      run: |
+        python cross-pipeline-repository/scripts/validar_nome_repositorio.py \
+          "${{ steps.montar.outputs.nome-repositorio }}" --github-output

@@ -31,6 +31,14 @@ jobs:
       - name: Instalar dependências
         run: pip install pyyaml
 
+      - name: Garantir visibilidade privada
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO_OWNER/$REPO_NAME" \
+            -F "private=true"
+
       - name: Validar nome do novo repositório
         id: validar
         continue-on-error: true
